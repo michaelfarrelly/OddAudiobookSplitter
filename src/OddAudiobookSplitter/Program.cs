@@ -65,9 +65,9 @@ class Program
                 var doc = new XmlDocument();
                 doc.LoadXml(xmlMarkers);
 
-                XmlElement root = doc.DocumentElement;
+                XmlElement? root = doc?.DocumentElement;
 
-                if (root.Name == "Markers")
+                if (root?.Name == "Markers")
                 {
                     var markers = root.GetElementsByTagName("Marker");
 
