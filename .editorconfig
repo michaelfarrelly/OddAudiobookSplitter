@@ -1,0 +1,39 @@
+# https://editorconfig.org/
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{config,json,jsonc,csproj,props,yml,resx}]
+indent_size = 2
+
+[*.cs]
+dotnet_diagnostic.IDE0041.severity = none # Null check can be simplified
+dotnet_diagnostic.IDE0042.severity = none # Variable declaration can be deconstructed
+dotnet_diagnostic.IDE0071.severity = none # Interpolation can be simplified
+dotnet_diagnostic.IDE0090.severity = none # disable new(params)
+dotnet_diagnostic.CA1014.severity = none # Mark assemblies with CLSCompliant: disabled because value os "Common Language Specification" in .NET Core is unclear and Microsoft teams don't seem to care about it, see https://github.com/aspnet/AspNetCore/issues/2689 -->
+dotnet_diagnostic.CA1303.severity = none # Do not pass literals as localized parameters: disabled because we don't need to support i18n just yet -->
+dotnet_diagnostic.CA1506.severity = none # Avoid excessive class coupling: disabled because functional style often brings together functionality from many classes -->
+dotnet_diagnostic.CA1812.severity = none # Avoid uninstantiated internal classes: disabled because we would have to suppress warning for every dependency-injected class -->
+dotnet_diagnostic.CA1847.severity = none # Use string.Contains(char) instead of string.Contains(string) with single characters.
+dotnet_diagnostic.CA1707.severity = none # Identifiers should not contain underscores
+csharp_style_implicit_object_creation_when_type_is_apparent = false
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_style_var_elsewhere = true:silent
+
+[*.cshtml]
+insert_final_newline = false
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{sln,DotSettings}]
+indent_style = tab
+indent_size = 4
+
