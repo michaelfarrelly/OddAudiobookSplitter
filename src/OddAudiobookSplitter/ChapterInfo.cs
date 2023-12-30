@@ -1,3 +1,4 @@
+
 namespace OddAudiobookSplitter;
 
 public record ChapterInfo
@@ -8,4 +9,9 @@ public record ChapterInfo
     public int FileChapter;
 
     public string? SrcFile;
+
+    public TimeSpan SrcDuration;
+
+    public TimeSpan? StartTime;
+    public TimeSpan? EndTime;
 }

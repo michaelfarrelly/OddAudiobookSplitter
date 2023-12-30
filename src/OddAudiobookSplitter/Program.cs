@@ -1,45 +1,113 @@
 ﻿namespace OddAudiobookSplitter;
 
+using System.ComponentModel.DataAnnotations;
 using System.Xml;
 using FFMpegCore;
 
 class Program
 {
-    async static Task Main(string[] args)
+    static void Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        Console.WriteLine("OddAudiobookSplitter");
 
-        var folderInfo = new DirectoryInfo("C:\\Users\\michael\\Documents\\Audiobooks\\Rhythm of War\\");
-
-        // filename count of chapters (prologues and pretext increment)
-        var chapterCount = 0;
-
-        var actions = new List<ChapterInfo>();
-        foreach (var file in folderInfo.GetFiles())
-        {
-            if (file.Name.EndsWith("mp3", StringComparison.OrdinalIgnoreCase))
+        var unvalidatedFolderName = args[0];
+        ValidateFolderName(unvalidatedFolderName)
+            .OnSuccess(folderInfo =>
             {
-                var result = await GetMediaInfo(file.FullName, chapterCount);
+                // "C:\\Users\\michael\\Documents\\Audiobooks\\Rhythm of War\\"
+                Console.WriteLine($"Using folder: {folderInfo}");
 
-                chapterCount += result.chapterCount;
-                actions.AddRange(result.chapterInfos);
-            }
-        }
+                // filename count of chapters (prologues and pretext increment)
+                var chapterCount = 0;
+
+                var actions = new List<ChapterInfo>();
+                foreach (var file in folderInfo.GetFiles())
+                {
+                    if (file.Name.EndsWith("mp3", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var result = GetMediaInfo(file.FullName, chapterCount);
+
+                        chapterCount += result.chapterCount;
+                        actions.AddRange(result.chapterInfos);
+                    }
+                }
+
+                // split current mp3 file into parts.
+                foreach (var action in actions)
+                {
+                    Console.WriteLine(action.SrcFile);
+                    Console.WriteLine($"{action.FileChapter}-{action.Name}-{action.TimeCode}-{action.StartTime}-{action.EndTime} ({action.SrcDuration})");
+                    // Console.WriteLine(action.TimeCode);
+                    // Console.WriteLine(action.StartTime);
+                    // Console.WriteLine(action.EndTime);
+
+                    // FFMpeg.ExtractAudio()
+                    // FFMpeg.SubVideo(action.SrcFile, "output.mp3", startTime, endTime);
+
+                    // FFMpegArguments
+                    //      .FromFileInput(input, true, options => options.Seek(startTime).EndSeek(endTime))
+                    //      .OutputToFile(output, true, options => options.CopyChannel())
+                    //      .ProcessSynchronously();
+
+                }
+            });
 
 
-        foreach (var action in actions)
-        {
-            Console.WriteLine(action.SrcFile);
-            Console.WriteLine(action.FileChapter);
-            Console.WriteLine(action.Name);
-            Console.WriteLine(action.TimeCode);
-        }
     }
 
-    async static Task<(int chapterCount, List<ChapterInfo> chapterInfos)> GetMediaInfo(string inputPath, int chapterCount)
+    private static Result<DirectoryInfo> ValidateFolderName(string unvalidatedFolderName)
     {
-        var internalChapterCount = chapterCount;
-        var mediaInfo = await FFProbe.AnalyseAsync(inputPath);
+        if (string.IsNullOrEmpty(unvalidatedFolderName))
+        {
+            return Result.Fail<DirectoryInfo>("folder name must be provided");
+        }
+
+        var directoryInfo = new DirectoryInfo(unvalidatedFolderName);
+        if (!directoryInfo.Exists)
+        {
+            return Result.Fail<DirectoryInfo>("folder name must be provided");
+        }
+
+        return Result.Ok<DirectoryInfo>(directoryInfo);
+    }
+
+    private static Result<TimeSpan> ValidateTimeSpan(string? unvalidatedTimeSpan)
+    {
+        if (string.IsNullOrEmpty(unvalidatedTimeSpan))
+        {
+            return Result.Fail<TimeSpan>("timespan must be provided");
+        }
+
+        var parts = unvalidatedTimeSpan.Split(":");
+        if (parts.Count() == 2)
+        {
+            // check first part to see if its greater than 60.
+
+            var minutes = int.Parse(parts[0]);
+            if (minutes > 59)
+            {
+                // fix it.
+                // 63:25.000 -> 01:03:25.000
+                unvalidatedTimeSpan = $"01:{(minutes - 59).ToString().PadLeft(2, '0')}:{parts[1]}";
+            }
+            else
+            {
+
+                // pad the time string
+                unvalidatedTimeSpan = $"00:{unvalidatedTimeSpan}";
+            }
+
+        }
+
+        var ts = TimeSpan.Parse(unvalidatedTimeSpan);
+
+        return Result.Ok<TimeSpan>(ts);
+    }
+
+    static (int chapterCount, List<ChapterInfo> chapterInfos) GetMediaInfo(string inputPath, int chapterCount)
+    {
+        var fileChapterCount = 0;
+        var mediaInfo = FFProbe.Analyse(inputPath);
 
         // Console.WriteLine($"Filename: {inputPath}");
         // Console.WriteLine($"Duration: {mediaInfo.Format.Duration}");
@@ -73,29 +141,58 @@ class Program
 
                     ///Console.WriteLine($"Found: {markers.Count} markers");
 
+
                     foreach (XmlElement marker in markers)
                     {
-                        var name = marker.GetElementsByTagName("Name").Cast<XmlElement>().Single().InnerText;
-                        var time = marker.GetElementsByTagName("Time").Cast<XmlElement>().Single().InnerText;
+                        var name = marker.GetElementsByTagName("Name").Cast<XmlElement>().Single().InnerText.Trim();
+                        var time = marker.GetElementsByTagName("Time").Cast<XmlElement>().Single().InnerText.Trim();
+
+                        var ts = ValidateTimeSpan(time);
+
+                        // check for next sibling
+                        var endTime = GetNextTimeSpan(marker, mediaInfo.Format.Duration);
 
                         // Console.WriteLine($"Name: {name} markers");
                         // Console.WriteLine($"Time: {time} markers");
 
-                        actions.Add(new ChapterInfo() { Name = name, TimeCode = time, FileChapter = internalChapterCount, SrcFile = inputPath });
+                        actions.Add(new ChapterInfo
+                        {
+                            Name = name,
+                            TimeCode = time,
+                            StartTime = ts.Success ? ts.Value : null,
+                            EndTime = endTime,
+                            FileChapter = chapterCount + fileChapterCount,
+                            SrcFile = inputPath,
+                            SrcDuration = mediaInfo.Format.Duration
+                        });
 
-                        internalChapterCount++;
+
+
+                        fileChapterCount++;
                     }
                 }
 
 
-                // split current mp3 file into parts.
+
             }
 
             // Console.WriteLine($"====================");
 
 
         }
-        return (internalChapterCount, actions);
+        return (fileChapterCount, actions);
+    }
+
+    public static TimeSpan GetNextTimeSpan(XmlElement marker, TimeSpan fileDuration)
+    {
+        var nextText = (marker.NextSibling as XmlElement)?
+            .GetElementsByTagName("Time")
+            .Cast<XmlElement>()
+            .Single().InnerText;
+
+        var ts = ValidateTimeSpan(nextText);
+
+        return ts.Success ? ts.Value : fileDuration;
     }
 
 }
