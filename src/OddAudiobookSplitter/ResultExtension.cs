@@ -56,6 +56,14 @@ public static class ResultExtensions
         return func(result.Value);
     }
 
+    public static Result<TR> OnSuccess<T, TR>(this Result<T> result, Func<T, Result<TR>> func)
+    {
+        if (result.Failure)
+            return Result.Fail<TR>(result.Error);
+
+        return func(result.Value);
+    }
+
     public static Result OnFailure(this Result result, Action action)
     {
         if (result.Failure)

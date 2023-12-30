@@ -11,48 +11,75 @@ class Program
         Console.WriteLine("OddAudiobookSplitter");
 
         var unvalidatedFolderName = args[0];
-        ValidateFolderName(unvalidatedFolderName)
-            .OnSuccess(folderInfo =>
+        var result = ValidateFolderName(unvalidatedFolderName)
+            .OnSuccess(Analyze);
+
+        if (result.Failure)
+        {
+            // report failures
+            Console.WriteLine(result.Error);
+        }
+
+        if (result.Success)
+        {
+            Run(result.Value);
+        }
+
+    }
+
+    private static Result<(DirectoryInfo folderInfo, List<ChapterInfo>)> Analyze(DirectoryInfo folderInfo)
+    {
+
+        // "C:\\Users\\michael\\Documents\\Audiobooks\\Rhythm of War\\"
+        Console.WriteLine($"Using folder: {folderInfo}");
+
+        // filename count of chapters (prologues and pretext increment)
+        var chapterCount = 0;
+
+        var actions = new List<ChapterInfo>();
+        foreach (var file in folderInfo.GetFiles())
+        {
+            if (file.Name.EndsWith("mp3", StringComparison.OrdinalIgnoreCase))
             {
-                // "C:\\Users\\michael\\Documents\\Audiobooks\\Rhythm of War\\"
-                Console.WriteLine($"Using folder: {folderInfo}");
+                var result = GetMediaInfo(file.FullName, chapterCount);
 
-                // filename count of chapters (prologues and pretext increment)
-                var chapterCount = 0;
+                chapterCount += result.chapterCount;
+                actions.AddRange(result.chapterInfos);
+            }
+        }
 
-                var actions = new List<ChapterInfo>();
-                foreach (var file in folderInfo.GetFiles())
-                {
-                    if (file.Name.EndsWith("mp3", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var result = GetMediaInfo(file.FullName, chapterCount);
+        return Result.Ok<(DirectoryInfo folderInfo, List<ChapterInfo>)>((folderInfo, actions));
 
-                        chapterCount += result.chapterCount;
-                        actions.AddRange(result.chapterInfos);
-                    }
-                }
+    }
 
-                // split current mp3 file into parts.
-                foreach (var action in actions)
-                {
-                    Console.WriteLine(action.SrcFile);
-                    Console.WriteLine($"{action.FileChapter}-{action.Name}-{action.TimeCode}-{action.StartTime}-{action.EndTime} ({action.SrcDuration})");
-                    // Console.WriteLine(action.TimeCode);
-                    // Console.WriteLine(action.StartTime);
-                    // Console.WriteLine(action.EndTime);
+    private static Result Run((DirectoryInfo folderInfo, List<ChapterInfo> actions) data)
+    {
+        var actions = data.actions;
+        var folderInfo = data.folderInfo;
 
-                    // FFMpeg.ExtractAudio()
-                    // FFMpeg.SubVideo(action.SrcFile, "output.mp3", startTime, endTime);
+        // split current mp3 file into parts.
+        foreach (var action in actions)
+        {
+            Console.WriteLine(action.SrcFile);
+            Console.WriteLine($"{action.FileChapter}-{action.Name}-{action.TimeCode}-{action.StartTime}-{action.EndTime} ({action.SrcDuration})");
+            // Console.WriteLine(action.TimeCode);
+            // Console.WriteLine(action.StartTime);
+            // Console.WriteLine(action.EndTime);
 
-                    // FFMpegArguments
-                    //      .FromFileInput(input, true, options => options.Seek(startTime).EndSeek(endTime))
-                    //      .OutputToFile(output, true, options => options.CopyChannel())
-                    //      .ProcessSynchronously();
+            // FFMpeg.ExtractAudio()
+            // FFMpeg.SubVideo(action.SrcFile, "output.mp3", startTime, endTime);
 
-                }
-            });
+            Console.WriteLine($"Extracting audio");
 
+            var output = $"{folderInfo.FullName}output\\{folderInfo.Name}-{action.FileChapter}-{action.Name}.mp3";
+            FFMpegArguments
+                 .FromFileInput(action.SrcFile, true, options => options.Seek(action.StartTime).EndSeek(action.EndTime))
+                 .OutputToFile(output, true, options => options.CopyChannel())
+                 .ProcessSynchronously();
 
+        }
+
+        return Result.Ok();
     }
 
     private static Result<DirectoryInfo> ValidateFolderName(string unvalidatedFolderName)
@@ -65,17 +92,22 @@ class Program
         var directoryInfo = new DirectoryInfo(unvalidatedFolderName);
         if (!directoryInfo.Exists)
         {
-            return Result.Fail<DirectoryInfo>("folder name must be provided");
+            return Result.Fail<DirectoryInfo>("folder name must exist");
         }
 
-        return Result.Ok<DirectoryInfo>(directoryInfo);
+        return Result.Ok(directoryInfo);
     }
 
+    /// <summary>
+    /// This doesn't validate all TimeSpans. Just ones from the Overdrive Metadata tag on their MP3 files.
+    ///
+    /// Overdrive uses MM:SS.SSSS format, and if the minutes exceeds 59, it keeps counting (has no hour unit, which TimeSpan expects).
+    /// </summary>
     private static Result<TimeSpan> ValidateTimeSpan(string? unvalidatedTimeSpan)
     {
         if (string.IsNullOrEmpty(unvalidatedTimeSpan))
         {
-            return Result.Fail<TimeSpan>("timespan must be provided");
+            return Result.Fail<TimeSpan>("TimeSpan must be provided");
         }
 
         var parts = unvalidatedTimeSpan.Split(":");
@@ -92,7 +124,6 @@ class Program
             }
             else
             {
-
                 // pad the time string
                 unvalidatedTimeSpan = $"00:{unvalidatedTimeSpan}";
             }
@@ -101,7 +132,7 @@ class Program
 
         var ts = TimeSpan.Parse(unvalidatedTimeSpan);
 
-        return Result.Ok<TimeSpan>(ts);
+        return Result.Ok(ts);
     }
 
     static (int chapterCount, List<ChapterInfo> chapterInfos) GetMediaInfo(string inputPath, int chapterCount)
