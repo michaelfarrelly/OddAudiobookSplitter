@@ -3,6 +3,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Xml;
 using FFMpegCore;
+using FFMpegCore.Arguments;
+using FFMpegCore.Builders.MetaData;
 
 class Program
 {
@@ -71,12 +73,40 @@ class Program
 
             Console.WriteLine($"Extracting audio");
 
-            var output = $"{folderInfo.FullName}output\\{folderInfo.Name}-{action.FileChapter}-{action.Name}.mp3";
-            FFMpegArguments
-                 .FromFileInput(action.SrcFile, true, options => options.Seek(action.StartTime).EndSeek(action.EndTime))
-                 .OutputToFile(output, true, options => options.CopyChannel())
-                 .ProcessSynchronously();
+            var output = $"{outputFolder}{folderInfo.Name}-{action.FileChapter.ToString().PadLeft(3, '0')}-{action.Name}.mp3";
+            var builder = new MetaDataBuilder();
 
+            foreach (var tag in action.Tags)
+            {
+                if (tag.Key.Equals("track", StringComparison.InvariantCultureIgnoreCase)
+                    || tag.Key.Equals("title", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // ignore them.
+                }
+                else
+                {
+                    builder.WithEntry(tag.Key, tag.Value);
+                }
+            }
+            builder
+                .WithTitle($"{folderInfo.Name}-{action.FileChapter}-{action.Name}")
+                .WithEntry("track", action.FileChapter.ToString());
+
+            var metadata = builder.Build();
+            var serialized = MetaDataSerializer.Instance.Serialize(metadata);
+
+            Console.WriteLine($": {serialized}");
+
+            FFMpegArguments
+
+                .FromFileInput(action.SrcFile, true, options => options
+                    .Seek(action.StartTime)
+                    .EndSeek(action.EndTime))
+                .AddMetaData(serialized)
+                .OutputToFile(output, true, options => options
+                    .CopyChannel()
+                )
+                 .ProcessSynchronously();
         }
 
         return Result.Ok();
@@ -194,7 +224,8 @@ class Program
                             EndTime = endTime,
                             FileChapter = chapterCount + fileChapterCount,
                             SrcFile = inputPath,
-                            SrcDuration = mediaInfo.Format.Duration
+                            SrcDuration = mediaInfo.Format.Duration,
+                            Tags = tags
                         });
 
 

@@ -1,4 +1,5 @@
 
+
 namespace OddAudiobookSplitter;
 
 public record ChapterInfo
@@ -14,4 +15,6 @@ public record ChapterInfo
 
     public TimeSpan? StartTime;
     public TimeSpan? EndTime;
+
+    public Dictionary<string, string>? Tags;
 }
