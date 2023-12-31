@@ -59,6 +59,13 @@ class Program
         var actions = data.actions;
         var folderInfo = data.folderInfo;
 
+        // create output folder, it doesnt exist
+        var outputFolder = new DirectoryInfo($"{folderInfo.FullName}output\\");
+        if (!outputFolder.Exists)
+        {
+            outputFolder.Create();
+        }
+
         // split current mp3 file into parts.
         foreach (var action in actions)
         {
