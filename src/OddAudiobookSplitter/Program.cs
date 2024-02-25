@@ -60,7 +60,7 @@ class Program
         var folderInfo = data.folderInfo;
 
         // create output folder, it doesnt exist
-        var outputFolder = new DirectoryInfo($"{folderInfo.FullName}output\\");
+        var outputFolder = new DirectoryInfo($"{folderInfo.FullName}{folderInfo.Name}\\");
         if (!outputFolder.Exists)
         {
             outputFolder.Create();
