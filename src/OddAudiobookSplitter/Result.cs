@@ -29,17 +29,17 @@ public class Result
 
     public static Result<T> Fail<T>(string message)
     {
-        return new Result<T>(default(T), false, message);
+        return new Result<T>(default, false, message);
     }
 
     public static Result Ok()
     {
-        return new Result(true, String.Empty);
+        return new Result(true, string.Empty);
     }
 
     public static Result<T> Ok<T>(T value)
     {
-        return new Result<T>(value, true, String.Empty);
+        return new Result<T>(value, true, string.Empty);
     }
 
     public static Result Combine(params Result[] results)
@@ -57,6 +57,7 @@ public class Result
 
 public class Result<T> : Result
 {
+    [AllowNull]
     private T _value;
 
     public T Value
@@ -75,6 +76,7 @@ public class Result<T> : Result
         : base(success, error)
     {
         System.Diagnostics.Contracts.Contract.Requires(value != null || !success);
+        ArgumentNullException.ThrowIfNull(value);
 
         Value = value;
     }

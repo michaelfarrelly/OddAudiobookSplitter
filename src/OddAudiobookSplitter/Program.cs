@@ -69,6 +69,11 @@ class Program
         // split current mp3 file into parts.
         foreach (var action in actions)
         {
+            if (action.SrcFile is null)
+            {
+                // ignore this entry
+                continue;
+            }
             Console.WriteLine(action.SrcFile);
             Console.WriteLine($"{action.FileChapter}-{action.Name}-{action.TimeCode}-{action.StartTime}-{action.EndTime} ({action.SrcDuration})");
             // Console.WriteLine(action.TimeCode);
@@ -83,7 +88,7 @@ class Program
             var output = $"{outputFolder}{folderInfo.Name}-{action.FileChapter.ToString().PadLeft(3, '0')}-{action.Name}.mp3";
             var builder = new MetaDataBuilder();
 
-            foreach (var tag in action.Tags)
+            foreach (var tag in action.Tags ?? [])
             {
                 if (tag.Key.Equals("track", StringComparison.InvariantCultureIgnoreCase)
                     || tag.Key.Equals("title", StringComparison.InvariantCultureIgnoreCase))
@@ -104,8 +109,7 @@ class Program
 
             Console.WriteLine($": {serialized}");
 
-            FFMpegArguments
-
+            _ = FFMpegArguments
                 .FromFileInput(action.SrcFile, true, options => options
                     .Seek(action.StartTime)
                     .EndSeek(action.EndTime))
