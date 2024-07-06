@@ -216,8 +216,14 @@ class Program
 
                     foreach (XmlElement marker in markers)
                     {
-                        var name = marker.GetElementsByTagName("Name").Cast<XmlElement>().Single().InnerText.Trim();
+                        // Three body problem has time codes in the Name field.
+                        var name = marker.GetElementsByTagName("Name").Cast<XmlElement>().Single().InnerText.Trim()
+                            .Replace(":", "-")
+                            .Replace("(", "-")
+                            .Replace(")", "-");
                         var time = marker.GetElementsByTagName("Time").Cast<XmlElement>().Single().InnerText.Trim();
+
+                        // replace
 
                         var ts = ValidateTimeSpan(time);
 
